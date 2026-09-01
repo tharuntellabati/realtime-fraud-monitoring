@@ -1,0 +1,30 @@
+# data + spark artifacts
+data/
+spark-warehouse/
+metastore_db/
+derby.log
+*.parquet
+*.crc
+_SUCCESS
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# secrets
+.env
+*.pem
+credentials.json
+
+# editors / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# logs
+*.log

@@ -1,0 +1,53 @@
+# Data quality checks applied before any transaction reaches the rules
+# engine. A row failing any check is quarantined with the failing check
+# names attached, never silently dropped.
+
+unique_key: txn_id
+
+checks:
+  - name: txn_id_not_null
+    type: not_null
+    column: txn_id
+
+  - name: account_id_not_null
+    type: not_null
+    column: account_id
+
+  - name: txn_ts_not_null
+    type: not_null
+    column: txn_ts
+
+  - name: amount_not_null
+    type: not_null
+    column: amount
+
+  - name: amount_positive
+    type: positive
+    column: amount
+
+  - name: amount_within_ceiling
+    type: max_value
+    column: amount
+    params:
+      value: 10000000
+    # Anything above ten million on a retail feed is an upstream defect,
+    # not a transaction. Scoring it would produce a guaranteed alert on a
+    # record that is not real.
+
+  - name: currency_valid
+    type: allowed_values
+    column: currency
+    params:
+      values: [USD, EUR, GBP, INR, SGD, AED]
+
+  - name: channel_valid
+    type: allowed_values
+    column: channel
+    params:
+      values: [ATM, POS, ONLINE, WIRE, MOBILE, BRANCH]
+
+  - name: country_format
+    type: regex
+    column: country
+    params:
+      pattern: "^[A-Z]{2}$"

@@ -1,0 +1,99 @@
+# Fraud detection rules.
+#
+# Thresholds live here rather than in code because they change constantly.
+# Retuning a threshold after a false-positive review should be a pull
+# request against this file, not a redeploy of the engine.
+#
+# weight  -> points added to risk_score when the rule fires
+# enabled -> flip to false to retire a rule without deleting its history
+
+min_alert_band: MEDIUM
+
+risk_bands:
+  critical: 70
+  high: 45
+  medium: 20
+
+rules:
+  - name: high_value_txn
+    type: high_value
+    enabled: true
+    weight: 25
+    params:
+      amount_threshold: 15000
+    description: >
+      Single transaction at or above the manual-review ceiling.
+
+  - name: velocity_burst
+    type: velocity
+    enabled: true
+    weight: 30
+    params:
+      max_txns_per_hour: 8
+    description: >
+      Card testing and account takeover both show up as a burst of small
+      authorisations in a tight window. Eight in an hour is well outside
+      normal retail behaviour.
+
+  - name: structuring
+    type: structuring
+    enabled: true
+    weight: 40
+    params:
+      reporting_threshold: 10000
+      band_pct: 0.85
+    description: >
+      Deposits repeatedly parked between 8,500 and 10,000 while the daily
+      total clears the reporting threshold anyway.
+
+  - name: impossible_travel
+    type: impossible_travel
+    enabled: true
+    weight: 35
+    params:
+      max_hours_between: 2
+    description: >
+      Same account transacting in two countries closer together in time
+      than a person could physically travel.
+
+  - name: dormant_reactivation
+    type: dormant_reactivation
+    enabled: true
+    weight: 30
+    params:
+      dormant_days: 90
+      amount_threshold: 5000
+    description: >
+      Long-silent account suddenly moving significant funds - a common
+      signature of account takeover and of mule account activation.
+
+  - name: new_beneficiary_high_value
+    type: new_beneficiary_high_value
+    enabled: true
+    weight: 20
+    params:
+      amount_threshold: 10000
+    description: >
+      First payment to a payee, and it is a large one.
+
+  - name: odd_hour_activity
+    type: odd_hour
+    enabled: true
+    weight: 10
+    params:
+      start_hour: 1
+      end_hour: 5
+      amount_threshold: 2000
+    description: >
+      Low weight on purpose. Odd hours alone mean little; the value is in
+      the score it contributes when it stacks with something else.
+
+  - name: high_risk_corridor
+    type: high_risk_corridor
+    enabled: true
+    weight: 15
+    params:
+      categories: [gambling, crypto]
+      amount_threshold: 1000
+    description: >
+      Elevated base risk categories above a floor amount.

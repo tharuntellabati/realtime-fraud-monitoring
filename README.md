@@ -1,5 +1,7 @@
 # Real-Time Transaction Fraud Monitoring Engine
 
+[![CI](https://github.com/tharuntellabati/realtime-fraud-monitoring/actions/workflows/ci.yml/badge.svg)](https://github.com/tharuntellabati/realtime-fraud-monitoring/actions/workflows/ci.yml)
+
 A config-driven fraud detection pipeline for banking transaction data, built on PySpark. Transactions pass through a data quality gate, get scored against eight windowed fraud rules, and land as ranked alerts — with source-to-target reconciliation proving no record was silently lost along the way.
 
 Runs on a laptop against a synthetic feed. The same code runs on Databricks by changing two paths.
@@ -100,7 +102,7 @@ ACC9001  $27,500.00  WIRE  AE   score 90  CRITICAL
 
 ## Data quality checks
 
-Nine checks run before any rule sees a transaction, declared in `config/dq_rules.yaml`:
+Nine row-level checks plus duplicate detection run before any rule sees a transaction, declared in `config/dq_rules.yaml`:
 
 `not_null` on the four required fields · `positive` amounts · `max_value` ceiling (anything above 10M on a retail feed is an upstream defect, not a transaction) · `allowed_values` for currency and channel · `regex` on country codes · duplicate detection on `txn_id`
 
@@ -110,11 +112,13 @@ Quarantined rows keep a `dq_failures` array naming every check they broke, so th
 
 ## Running it
 
-Requires Python 3.9+ and Java 11 or 17 (PySpark needs a JVM).
+Requires **Python 3.9-3.11** and Java 8u371+, 11, or 17 (PySpark needs a JVM).
+
+PySpark 3.5.1 does not support Python 3.12 — the Spark Python workers crash on startup with no traceback. Use 3.11 or older.
 
 ```bash
-git clone https://github.com/tharuntellabati/txn-fraud-engine.git
-cd txn-fraud-engine
+git clone https://github.com/tharuntellabati/realtime-fraud-monitoring.git
+cd realtime-fraud-monitoring
 pip install -r requirements.txt
 
 python -m src.generator          # writes ~720 synthetic transactions
@@ -126,7 +130,19 @@ Outputs land in `data/out/` as Parquet: `alerts/`, `quarantine/`, `dq_summary/`,
 
 **Streaming mode.** `python -m src.streaming` reads the landing directory as a Structured Streaming file source and processes new files as they arrive. It calls the same `apply_dq` and `score` functions the batch job uses — that reuse is deliberate, since two copies of a fraud rule drift apart and then batch and real-time disagree about whether a transaction was ever flagged.
 
-**On Windows**, PySpark also needs `winutils.exe` on the path. If that's a hassle, the project imports directly into Databricks Community Edition (free) — put the `src/` files in a repo folder and run `pipeline.run()` from a notebook.
+**On Windows**, three things bite, in this order:
+
+1. **`JAVA_HOME` must point at the JDK root, not `\bin`.** If it ends in `\bin`, Spark looks
+   for `%JAVA_HOME%\bin\java.exe` and reports `The system cannot find the path specified`.
+2. **`winutils.exe` and `hadoop.dll`** must sit in `%HADOOP_HOME%\bin`. Without them even
+   listing the landing directory fails with `UnsatisfiedLinkError: NativeIO$Windows.access0`.
+3. **No spaces in the path to your Python interpreter.** Spark's worker launcher does not
+   quote it, so a venv under `C:\Users\...\My Folder\` produces `Missing Python executable`.
+   Point `PYSPARK_PYTHON` at a space-free path.
+
+If that's a hassle, skip it: CI runs the full pipeline on Ubuntu on every push, and the
+project imports directly into Databricks Community Edition (free) — put the `src/`
+files in a repo folder and run `pipeline.run()` from a notebook.
 
 ---
 
