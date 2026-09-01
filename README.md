@@ -174,6 +174,8 @@ src/
   streaming.py        Structured Streaming variant
 tests/
   test_rules.py       7 tests: each pattern caught + false-positive guard
+.github/workflows/
+  ci.yml              tests + full pipeline run, recon must PASS
 ```
 
 ---
