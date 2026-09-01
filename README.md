@@ -140,9 +140,11 @@ Outputs land in `data/out/` as Parquet: `alerts/`, `quarantine/`, `dq_summary/`,
    quote it, so a venv under `C:\Users\...\My Folder\` produces `Missing Python executable`.
    Point `PYSPARK_PYTHON` at a space-free path.
 
-If that's a hassle, skip it: CI runs the full pipeline on Ubuntu on every push, and the
-project imports directly into Databricks Community Edition (free) — put the `src/`
-files in a repo folder and run `pipeline.run()` from a notebook.
+If that's a hassle, skip it. CI runs the full pipeline on Ubuntu on every push, and
+`notebooks/databricks_fraud_demo.py` runs the whole engine on Databricks Free Edition
+with no local setup at all — clone this repo into the workspace as a Git folder, open
+the notebook and run it. It imports the same `src.dq`, `src.rules` and `src.recon`
+modules the batch job uses.
 
 ---
 
@@ -174,6 +176,8 @@ src/
   streaming.py        Structured Streaming variant
 tests/
   test_rules.py       7 tests: each pattern caught + false-positive guard
+notebooks/
+  databricks_fraud_demo.py   end-to-end run on Databricks
 .github/workflows/
   ci.yml              tests + full pipeline run, recon must PASS
 ```
