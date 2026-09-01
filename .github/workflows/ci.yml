@@ -31,13 +31,19 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run test suite
-        run: pytest -q
+        run: |
+          set -o pipefail
+          pytest -q 2>/dev/null | tee test_output.txt
 
       - name: Generate synthetic feed
-        run: python -m src.generator
+        run: |
+          set -o pipefail
+          python -m src.generator | tee generator_output.txt
 
       - name: Run pipeline end to end
-        run: python -m src.pipeline
+        run: |
+          set -o pipefail
+          python -m src.pipeline 2>/dev/null | tee pipeline_output.txt
 
       - name: Assert reconciliation passed
         run: |
@@ -50,3 +56,96 @@ jobs:
           if status != "PASS":
               sys.exit("Reconciliation FAILED")
           PY
+
+      # Renders the real output of this run onto the Actions summary page,
+      # so the pipeline's own report is visible without opening the logs.
+      - name: Publish run report
+        if: always()
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, os
+
+
+          def read(path):
+              try:
+                  with open(path, encoding="utf-8") as fh:
+                      return fh.read().strip()
+              except OSError:
+                  return ""
+
+
+          print("# Real-Time Transaction Fraud Monitoring Engine")
+          print()
+          print("Output of this run. Every figure below was produced by the "
+                "pipeline in this job, not written by hand.")
+          print()
+
+          try:
+              with open("data/out/run_metrics.json", encoding="utf-8") as fh:
+                  m = json.load(fh)
+          except OSError:
+              m = None
+
+          if m:
+              r = m["reconciliation"]
+              status = r["status"]
+              badge = "PASS" if status == "PASS" else "FAIL"
+
+              print("## Reconciliation")
+              print()
+              print("| Measure | Value |")
+              print("|---|---|")
+              print(f"| Source rows | {r['source_count']:,} |")
+              print(f"| Clean rows | {r['clean_count']:,} |")
+              print(f"| Quarantined rows | {r['quarantined_count']:,} |")
+              print(f"| **Count break** | **{r['count_break']:,}** |")
+              print(f"| Source amount | {r['source_amount']:,.2f} |")
+              print(f"| Clean + quarantined | {r['split_amount']:,.2f} |")
+              print(f"| **Amount break** | **{r['amount_break']:,.2f}** |")
+              print(f"| **Status** | **{badge}** |")
+              print()
+
+              print("## Alerts")
+              print()
+              print("| Measure | Value |")
+              print("|---|---|")
+              print(f"| Run id | `{m['run_id']}` |")
+              print(f"| Alerts raised | {m['alert_count']:,} |")
+              print(f"| Alert rate | {m['alert_rate_pct']}% |")
+              print()
+
+          pipeline = read("pipeline_output.txt")
+          if pipeline:
+              print("## Pipeline console report")
+              print()
+              print("```text")
+              print(pipeline)
+              print("```")
+              print()
+
+          tests = read("test_output.txt")
+          if tests:
+              print("## Test suite")
+              print()
+              print("```text")
+              print(tests)
+              print("```")
+              print()
+
+          print("---")
+          print()
+          print("Source: "
+                "[tharuntellabati/realtime-fraud-monitoring]"
+                "(https://github.com/tharuntellabati/realtime-fraud-monitoring)")
+          PY
+
+      - name: Upload run outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-run-report
+          path: |
+            pipeline_output.txt
+            test_output.txt
+            data/out/run_metrics.json
+          if-no-files-found: warn
